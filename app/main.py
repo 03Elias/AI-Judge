@@ -55,16 +55,28 @@ def grounded_fact_summary_pdf(file_ids: List[str], extra: Optional[str] = None) 
         "- If a fact is unclear or disputed, mark it as 'unknown' or 'disputed'.\n"
         "- Do NOT merge separate incidents, parties, or dates unless explicitly linked in the text.\n"
         "- Keep it structured and concise.\n\n"
+        "INCLUDE:\n"
+        "- What happened (proven facts + disputed facts)\n"
+        "- What crime the court found / what culpability findings are explicit (e.g., 'uppsåt ej styrkt', 'grovt oaktsam')\n"
+        "- Aggravating/mitigating facts\n\n"
+        "EXCLUDE (skip completely):\n"
+        "- Any punishment type/length (fängelse, villkorlig, skyddstillsyn)\n"
+        "- Any sentencing evaluation language (påföljd, straffvärde, straffmätning, avräkning)\n"
+        "- Any outcomes about damages (skadestånd, ersättning, avgift, kr)\n"
+        "- Appellate outcome confirmations ('fastställer', 'tingsrättens dom ska därför inte ändras')\n"
+        "- 'Domslut' sections\n\n"
         "Return sections:\n"
         "1) Parties\n"
         "2) Timeline (dates/sequence)\n"
-        "3) Alleged acts / charges (as stated)\n"
-        "4) Evidence mentioned\n"
-        "5) Aggravating factors (explicit)\n"
-        "6) Mitigating factors (explicit)\n"
-        "7) Contradictions / disputed points\n"
-        "8) Unknowns / gaps\n"
-        "9) Potentially outcome-determinative facts (only explicit in text)\n"
+        "3) What happened (proven facts)\n"
+        "4) What happened (disputed facts)\n"
+        "5) Alleged acts / charges (as stated)\n"
+        "6) Crime/culpability findings (e.g., uppsåt ej styrkt, grovt oaktsam)\n"
+        "7) Evidence mentioned\n"
+        "8) Aggravating factors (explicit)\n"
+        "9) Mitigating factors (explicit)\n"
+        "10) Contradictions / disputed points\n"
+        "11) Unknowns / gaps\n"
     )
 
     if extra and extra.strip():
@@ -87,34 +99,51 @@ def grounded_fact_summary_pdf(file_ids: List[str], extra: Optional[str] = None) 
 
 def omission_guard_review_pdf(file_ids: List[str], facts_summary: str, extra: Optional[str] = None) -> str:
     """
-    Step 1.5: Detect potentially vital facts that may be missing, underweighted,
-    or contradictory relative to the grounded summary.
-    Returns text addendum used by the final judge step.
+    Step 1.5: Refine the Step 1 summary using original PDFs as ground truth.
+    Returns a revised grounded summary to be used directly by Step 2.
     """
     prompt = (
-        "You are a legal QA reviewer checking whether a case summary missed crucial details.\n\n"
+        "You are a legal QA reviewer refining a case summary using the original documents.\n\n"
         "Inputs: the original case documents + an existing facts summary.\n\n"
         "Rules:\n"
         "- Use ONLY document text.\n"
         "- Do NOT invent any legal rules or facts.\n"
-        "- Focus on omissions that could materially affect charging, culpability, or sentencing.\n"
-        "- For each finding, include one short direct quote (max 25 words).\n"
-        "- If no material omission is found, explicitly write 'No material omissions found'.\n\n"
-        "Return sections:\n"
-        "1) Potentially omitted material facts\n"
-        "2) Underemphasized facts (present but likely underweighted)\n"
-        "3) Contradictions requiring resolution\n"
-        "4) Ambiguities that could change sentencing\n"
-        "5) Minimal additional information needed for reliable sentencing\n"
+        "- Add missing material facts, correct inaccuracies, and remove unsupported claims.\n"
+        "- Keep evidence-grounded wording only; if uncertain, mark as 'unknown' or 'disputed'.\n"
+        "- Keep one short evidence quote (max 25 words) for each key fact.\n\n"
+        "INCLUDE:\n"
+        "- What happened (proven facts + disputed facts)\n"
+        "- What crime the court found / what culpability findings are explicit (e.g., 'uppsåt ej styrkt', 'grovt oaktsam')\n"
+        "- Aggravating/mitigating facts\n\n"
+        "EXCLUDE (skip completely):\n"
+        "- Any punishment type/length (fängelse, villkorlig, skyddstillsyn)\n"
+        "- Any sentencing evaluation language (påföljd, straffvärde, straffmätning, avräkning)\n"
+        "- Any outcomes about damages (skadestånd, ersättning, avgift, kr)\n"
+        "- Appellate outcome confirmations ('fastställer', 'tingsrättens dom ska därför inte ändras')\n"
+        "- 'Domslut' sections\n\n"
+        "Output requirement:\n"
+        "- Return ONLY the revised final summary (not a critique list).\n"
+        "- Use these sections exactly:\n"
+        "1) Parties\n"
+        "2) Timeline (dates/sequence)\n"
+        "3) What happened (proven facts)\n"
+        "4) What happened (disputed facts)\n"
+        "5) Alleged acts / charges (as stated)\n"
+        "6) Crime/culpability findings (e.g., uppsåt ej styrkt, grovt oaktsam)\n"
+        "7) Evidence mentioned\n"
+        "8) Aggravating factors (explicit)\n"
+        "9) Mitigating factors (explicit)\n"
+        "10) Contradictions / disputed points\n"
+        "11) Unknowns / gaps\n"
     )
 
     if extra and extra.strip():
         prompt += f"\nExtra instructions:\n{extra.strip()}\n"
 
     user_text = (
-        "EXISTING FACTS SUMMARY:\n"
+        "EXISTING FACTS SUMMARY TO REFINE:\n"
         f"{facts_summary}\n\n"
-        "Compare this summary against the original documents and return only evidence-grounded findings.\n"
+        "Compare this summary against the original documents and return the corrected, improved summary.\n"
     )
 
     content: List[Dict[str, Any]] = []
@@ -133,33 +162,39 @@ def omission_guard_review_pdf(file_ids: List[str], facts_summary: str, extra: Op
 
 
 def judge_decision_pdf(
-    file_ids: List[str],
-    facts_summary: str,
-    omission_review: Optional[str] = None,
+    revised_summary: str,
     extra: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Step 2: Produce strict JSON output using JSON Schema structured output.
-    Input is PDFs + the grounded facts summary.
+    Input is only the revised summary from Step 1.5.
     """
     system_instructions = (
         "You are an AI judge.\n\n"
         "You MUST follow these rules:\n"
-        "- Judge solely on Swedish laws AND the context given in the case documents.\n"
-        "- Do NOT use outside knowledge, memory, or internet sources.\n"
-        "- Do NOT invent statutes, legal principles, precedents, facts, or evidence.\n"
-        "- Treat the omission/contradiction review as a mandatory safety check before final sentencing.\n"
-        "- Re-check your conclusion against the ORIGINAL documents, not only the summary.\n"
-        "- If material contradictions or unresolved ambiguities remain, sentencing must be 'unknown'.\n"
-        "- If the documents do not provide enough information to justify a sentencing decision, set sentencing to 'unknown'\n"
-        "  and list exactly what is missing.\n"
+        "- Judge solely on Swedish laws AND the context given in the revised summary text.\n"
+        "- Use general Swedish law knowledge (statutes, legal principles, precedents, sentencing frameworks).\n"
+        "- Do NOT use outside case facts beyond the revised summary.\n"
+        "- Do NOT invent facts or evidence.\n"
+        "- Make a best-effort, evidence-grounded educated guess when certainty is below 100%.\n"
+        "- Always state uncertainty clearly in motivation when facts are incomplete, ambiguous, or disputed.\n"
+        "- Use 'unknown' only when the evidence is too conflicting or too incomplete for any responsible sentencing estimate.\n"
+        "- If certainty is below 100%, explain why and list exactly what additional information would most improve certainty.\n"
+        "- You MUST set certainty_level as one of: high, medium, low.\n"
+        "- Use high when uncertainty is minimal, medium when material uncertainty exists but a responsible estimate is possible, and low when uncertainty is substantial.\n"
         "- Be professional and neutral.\n"
         "- Output MUST match the JSON schema exactly.\n\n"
+        "IMPORTANT - Your input summary contains ONLY:\n"
+        "- What happened (proven facts + disputed facts)\n"
+        "- What crime the court found / culpability findings\n"
+        "- Aggravating/mitigating facts\n"
+        "It contains ZERO punishment, sentencing language, damages, or appellate outcomes.\n\n"
         "Task:\n"
-        "Using the provided documents and the facts summary, produce:\n"
+        "Using the revised summary, produce:\n"
         "1) Sentencing\n"
         "2) Motivation for that sentencing (explanation/conclusion)\n"
         "3) Short description of the case\n"
+        "4) Certainty level (high/medium/low)\n"
     )
 
     if extra and extra.strip():
@@ -172,35 +207,34 @@ def judge_decision_pdf(
             "sentencing": {"type": "string"},
             "motivation": {"type": "string"},
             "case_description": {"type": "string"},
+            "certainty_level": {
+                "type": "string",
+                "enum": ["high", "medium", "low"]
+            },
             "missing_information": {
                 "type": "array",
                 "items": {"type": "string"}
             }
         },
-        "required": ["sentencing", "motivation", "case_description", "missing_information"]
+        "required": ["sentencing", "motivation", "case_description", "certainty_level", "missing_information"]
     }
 
     user_text = (
-        "FACTS SUMMARY (grounded with evidence quotes):\n"
-        f"{facts_summary}\n\n"
-        "OMISSION / CONTRADICTION REVIEW:\n"
-        f"{omission_review or 'No omission review provided.'}\n\n"
-        "Now decide based on the documents and the facts summary.\n"
+        "REVISED SUMMARY (from Step 1.5):\n"
+        f"{revised_summary}\n\n"
+        "Now decide based only on this revised summary.\n"
         "Remember: do not invent laws or facts.\n"
-        "If any omission, contradiction, or ambiguity could materially affect sentencing and is unresolved, use 'unknown'\n"
-        "and list that missing/unclear information precisely.\n"
+        "If you are not 100% certain, still provide the best evidence-grounded sentencing estimate and clearly state uncertainty.\n"
+        "Use 'unknown' only if no responsible estimate can be made from the revised summary.\n"
+        "Always set certainty_level to exactly one of: high, medium, low.\n"
+        "Always list missing/unclear information precisely.\n"
     )
-
-    content: List[Dict[str, Any]] = []
-    for fid in file_ids:
-        content.append({"type": "input_file", "file_id": fid})
-    content.append({"type": "input_text", "text": user_text})
 
     client = get_openai_client()
     resp = client.responses.create(
         model=MODEL,
         instructions=system_instructions,
-        input=[{"role": "user", "content": content}],
+        input=user_text,
         reasoning={"effort": "high"},
         text={
             "format": {
@@ -235,20 +269,18 @@ async def analyze(
     # 2) Step 1: grounded fact extraction
     facts = grounded_fact_summary_pdf(file_ids, extra=extra_instructions)
 
-    # 2.5) Step 1.5: omission/contradiction guardrail review
-    omission_review = omission_guard_review_pdf(file_ids, facts_summary=facts, extra=extra_instructions)
+    # 2.5) Step 1.5: refine summary using PDFs + Step 1 summary
+    revised_summary = omission_guard_review_pdf(file_ids, facts_summary=facts, extra=extra_instructions)
 
-    # 3) Step 2: final decision JSON
+    # 3) Step 2: final decision JSON (input is only Step 1.5 revised summary)
     decision = judge_decision_pdf(
-        file_ids,
-        facts_summary=facts,
-        omission_review=omission_review,
+        revised_summary=revised_summary,
         extra=extra_instructions,
     )
 
     response_payload = {
         "facts_summary": facts,
-        "omission_review": omission_review,
+        "revised_summary": revised_summary,
         "result": decision,
         "model": MODEL,
     }
