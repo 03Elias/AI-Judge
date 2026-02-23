@@ -30,7 +30,7 @@ def upload_pdf_to_openai(file: UploadFile) -> str:
 
     try:
         client = get_openai_client()
-        # Upload as a file usable by Responses API
+        # upload as a file usable by Responses API
         uploaded = client.files.create(
             file=(file.filename, file.file, "application/pdf"),
             purpose="user_data",
