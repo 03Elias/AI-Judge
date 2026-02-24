@@ -135,6 +135,7 @@ def omission_guard_review_pdf(file_ids: List[str], facts_summary: str, extra: Op
         "9) Mitigating factors (explicit)\n"
         "10) Contradictions / disputed points\n"
         "11) Unknowns / gaps\n"
+        "12) Changes from Step 1 summary (added / removed / corrected)\n"
     )
 
     if extra and extra.strip():
