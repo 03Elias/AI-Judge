@@ -267,10 +267,10 @@ async def analyze(
     for f in files:
         file_ids.append(upload_pdf_to_openai(f))
 
-    # 2) Step 1: grounded fact extraction
+    # 2) Step 1: grounded fact extraction (summary of the case based only on verifiable facts in the PDFs, with evidence quotes)
     facts = grounded_fact_summary_pdf(file_ids, extra=extra_instructions)
 
-    # 2.5) Step 1.5: refine summary using PDFs + Step 1 summary
+    # 2.5) Step 1.5: refine summary using PDFs + Step 1 summary (acts as feedback loop)
     revised_summary = omission_guard_review_pdf(file_ids, facts_summary=facts, extra=extra_instructions)
 
     # 3) Step 2: final decision JSON (input is only Step 1.5 revised summary)
