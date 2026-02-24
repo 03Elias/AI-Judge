@@ -9,7 +9,7 @@ from openai import OpenAI
 
 load_dotenv()
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
+MODEL = "gpt-5.2"
 
 app = FastAPI(title="AI Judge Pipeline")
 
