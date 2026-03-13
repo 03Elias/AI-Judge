@@ -1,0 +1,14 @@
+
+
+
+{
+  "facts_summary": "...",
+  "revised_summary": "...",
+  "sentencing": "...",
+  "motivation": "...",
+  "certainty_level": "low/medium/high",
+  "missing_information": [
+    "..."
+  ],
+  "model": "gpt-5.2"
+}

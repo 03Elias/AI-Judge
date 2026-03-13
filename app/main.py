@@ -162,6 +162,7 @@ def omission_guard_review_pdf(file_ids: List[str], facts_summary: str, extra: Op
     return resp.output_text
 
 
+
 def judge_decision_pdf(
     revised_summary: str,
     extra: Optional[str] = None,
@@ -286,7 +287,7 @@ async def analyze(
         "model": MODEL,
     }
 
-    output_path = os.path.join(os.path.dirname(__file__), "AI_Judge_Decision.txt")
+    output_path = os.path.join(os.path.dirname(__file__), "AI_Judge_Decision.json")
     with open(output_path, "w", encoding="utf-8") as output_file:
         output_file.write(json.dumps(response_payload, ensure_ascii=True, indent=2))
 
